@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+	<title></title>
+	<meta name="generator" content="LibreOffice 26.8.0.3 (Linux)"/>
+	<meta name="created" content="00:00:00"/>
+	<meta name="changed" content="00:00:00"/>
+	<style type="text/css">
+		@page { size: 8.27in 11.69in; margin: 0.79in }
+		p { margin-bottom: 0.1in; line-height: 115%; background: transparent }
+		pre { font-size: 10pt; font-family: "Liberation Mono", monospace; background: transparent }
+	</style>
+</head>
+<body lang="en-US" link="#000080" vlink="#800000" dir="ltr"><pre style="margin-bottom: 0.2in; background: #e1e1e1">&lt;button id=&quot;permission-btn&quot;&gt;Tap to Start Motion&lt;/button&gt;  <br/>
+&lt;canvas id=&quot;foldCanvas&quot;&gt;&lt;/canvas&gt;  <br/>
+<br/>
+&lt;script&gt;  <br/>
+    const canvas = document.getElementById('foldCanvas');  <br/>
+    const ctx = canvas.getContext('2d');  <br/>
+    const btn = document.getElementById('permission-btn');  <br/>
+<br/>
+    const homeScreenImg = new Image();  <br/>
+    homeScreenImg.src = 'homescreen.png'; // Your iPad home screen screenshot  <br/>
+<br/>
+    let tiltAngle = 0;  <br/>
+    let foldFactor = 0;  <br/>
+<br/>
+    // --- IPAD APP HOTSPOTS (X, Y percentages relative to screen width/height) ---  <br/>
+    // Coordinates map to standard iPad Landscape positions  <br/>
+    const appHotspots = [  <br/>
+        // Row 1  <br/>
+        { name: 'Roblox', x: 0.18, y: 0.22, radius: 0.06, url: 'roblox://' },  <br/>
+        { name: 'YouTube', x: 0.38, y: 0.22, radius: 0.06, url: 'youtube://' },  <br/>
+        { name: 'Discord', x: 0.58, y: 0.22, radius: 0.06, url: 'discord://' },  <br/>
+        { name: 'Snapchat', x: 0.78, y: 0.22, radius: 0.06, url: 'snapchat://' },  <br/>
+<br/>
+        // Dock (Bottom)  <br/>
+        { name: 'Messages', x: 0.40, y: 0.90, radius: 0.05, url: 'sms://' },  <br/>
+        { name: 'Safari', x: 0.50, y: 0.90, radius: 0.05, url: 'https://apple.com' }  <br/>
+    ];  <br/>
+<br/>
+    function resize() {  <br/>
+        // Native pixel ratio scaling for iPad Retina display  <br/>
+        canvas.width = window.innerWidth * window.devicePixelRatio;  <br/>
+        canvas.height = window.innerHeight * window.devicePixelRatio;  <br/>
+    }  <br/>
+    window.addEventListener('resize', resize);  <br/>
+    resize();  <br/>
+<br/>
+    function render() {  <br/>
+        ctx.clearRect(0, 0, canvas.width, canvas.height);  <br/>
+<br/>
+        if (homeScreenImg.complete &amp;&amp; homeScreenImg.naturalWidth !== 0) {  <br/>
+            const w = canvas.width;  <br/>
+            const h = canvas.height;  <br/>
+<br/>
+            // Calculate squeeze/fold along the center axis  <br/>
+            foldFactor = Math.sin(tiltAngle * Math.PI / 180);  <br/>
+            foldFactor = Math.max(0, Math.min(1, foldFactor));  <br/>
+<br/>
+            const currentWidth = w * (1 - foldFactor * 0.70);  <br/>
+<br/>
+            ctx.save();  <br/>
+            ctx.filter = `blur(${foldFactor * 16}px)`;  <br/>
+            ctx.drawImage(homeScreenImg, 0, 0, w, h, 0, 0, currentWidth, h);  <br/>
+            ctx.restore();  <br/>
+<br/>
+            // Realistic hinge shadow gradient along the edge  <br/>
+            if (foldFactor &gt; 0.02) {  <br/>
+                const gradient = ctx.createLinearGradient(currentWidth - 60, 0, currentWidth, 0);  <br/>
+                gradient.addColorStop(0, 'rgba(0,0,0,0)');  <br/>
+                gradient.addColorStop(1, `rgba(0,0,0,${foldFactor * 0.85})`);  <br/>
+                ctx.fillStyle = gradient;  <br/>
+                ctx.fillRect(currentWidth - 60, 0, 60, h);  <br/>
+            }  <br/>
+        }  <br/>
+<br/>
+        requestAnimationFrame(render);  <br/>
+    }  <br/>
+<br/>
+    // Tap Detection  <br/>
+    canvas.addEventListener('pointerdown', (e) =&gt; {  <br/>
+        if (foldFactor &gt; 0.25) return; // Prevent launch if screen is mid-fold  <br/>
+<br/>
+        const rect = canvas.getBoundingClientRect();  <br/>
+        const tapX = (e.clientX - rect.left) / rect.width;  <br/>
+        const tapY = (e.clientY - rect.top) / rect.height;  <br/>
+<br/>
+        appHotspots.forEach(app =&gt; {  <br/>
+            const distance = Math.hypot(tapX - app.x, tapY - app.y);  <br/>
+            if (distance &lt; app.radius) {  <br/>
+                window.location.href = app.url;  <br/>
+            }  <br/>
+        });  <br/>
+    });  <br/>
+<br/>
+    // Request Gyroscope Motion Permissions (iPadOS Requirement)  <br/>
+    btn.addEventListener('click', () =&gt; {  <br/>
+        if (typeof DeviceOrientationEvent !== 'undefined' &amp;&amp; typeof DeviceOrientationEvent.requestPermission === 'function') {  <br/>
+            DeviceOrientationEvent.requestPermission()  <br/>
+                .then(response =&gt; {  <br/>
+                    if (response === 'granted') {  <br/>
+                        window.addEventListener('deviceorientation', handleMotion);  <br/>
+                        btn.style.display = 'none';  <br/>
+                    }  <br/>
+                })  <br/>
+                .catch(console.error);  <br/>
+        } else {  <br/>
+            window.addEventListener('deviceorientation', handleMotion);  <br/>
+            btn.style.display = 'none';  <br/>
+        }  <br/>
+    });  <br/>
+<br/>
+    function handleMotion(event) {  <br/>
+        // In Landscape, beta tracks the side-to-side folding rotation  <br/>
+        const isLandscape = window.innerWidth &gt; window.innerHeight;  <br/>
+        const rawAngle = isLandscape ? event.beta : event.gamma;  <br/>
+<br/>
+        if (rawAngle !== null) {  <br/>
+            tiltAngle = Math.abs(rawAngle);  <br/>
+        }  <br/>
+    }  <br/>
+<br/>
+    render();  <br/>
+&lt;/script&gt;  </pre><p>
+<br/>
+<br/>
+
+</p>
+</body>
+</html>
